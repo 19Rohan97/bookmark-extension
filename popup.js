@@ -1,4 +1,9 @@
 document.addEventListener("DOMContentLoaded", () => {
+  let currentPage = 1;
+  let bookmarksPerPage = 5;
+
+  let allBookmarks = []; // For filtering without fetching again
+
   const saveBtn = document.getElementById("saveBtn");
 
   chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
@@ -7,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  //SAVE
   saveBtn.addEventListener("click", async () => {
     console.log("Save button clicked");
 
@@ -39,24 +45,54 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  function renderBookmarks() {
+  //VIEW
+  function renderBookmarks(searchTerm = "", category = "") {
     chrome.storage.local.get(["bookmarks"], ({ bookmarks }) => {
+      if (!Array.isArray(bookmarks)) bookmarks = [];
+
+      const filtered = bookmarks.filter((b) => {
+        const matchSearch =
+          b.title.toLowerCase().includes(searchTerm) ||
+          b.tags.join(", ").toLowerCase().includes(searchTerm) ||
+          b.category.toLowerCase().includes(searchTerm);
+
+        const matchCategory = !category || b.category === category;
+        return matchSearch && matchCategory;
+      });
+
       const container = document.getElementById("bookmarkList");
       container.innerHTML = "";
 
-      if (!bookmarks.length) {
-        container.innerHTML = "<p>No bookmarks yet.</p>";
+      if (!filtered.length) {
+        container.innerHTML = "<p>No bookmarks found.</p>";
         return;
       }
 
       // ✅ Sort pinned bookmarks first
-      bookmarks.sort((a, b) => (b.pinned === a.pinned ? 0 : b.pinned ? 1 : -1));
+      filtered.sort((a, b) => (b.pinned === a.pinned ? 0 : b.pinned ? 1 : -1));
+
+      bookmarksPerPage = parseInt(
+        document.getElementById("itemsPerPage").value
+      );
+
+      // Pagination logic
+      const totalPages = Math.ceil(filtered.length / bookmarksPerPage);
+      if (currentPage > totalPages) currentPage = totalPages;
+
+      const start = (currentPage - 1) * bookmarksPerPage;
+      const end = start + bookmarksPerPage;
+      const pageItems = filtered.slice(start, end);
 
       const grouped = {};
-      bookmarks.forEach((b) => {
+      pageItems.forEach((b) => {
         if (!grouped[b.category]) grouped[b.category] = [];
         grouped[b.category].push(b);
       });
+
+      const resultCount = document.createElement("p");
+      resultCount.className = "text-muted";
+      resultCount.textContent = `${filtered.length} bookmark(s) found`;
+      container.appendChild(resultCount);
 
       for (const [category, items] of Object.entries(grouped)) {
         const catElem = document.createElement("div");
@@ -72,42 +108,53 @@ document.addEventListener("DOMContentLoaded", () => {
           const pinTitle = b.pinned ? "Unpin" : "Pin";
 
           item.innerHTML = `
-            <div class="d-flex flex-col justify-content-between align-items-start gap-3 bookmark_item">
-                <div>
-                    <a class="d-block" href="${b.url}" target="_blank">${
+                <div class="d-flex flex-col justify-content-between align-items-start gap-3 bookmark_item">
+                    <div>
+                        <a class="d-block" href="${b.url}" target="_blank">${
             b.title
           }</a>
-                    ${
-                      b.notes
-                        ? `<small class="d-block"><strong>Note:</strong> ${b.notes}</small>`
-                        : ""
-                    }
-                    <small class="d-inline-block me-2"><strong>Tags:</strong> ${b.tags.join(
-                      ", "
-                    )}</small>
-                    <small class="d-inline-block"><strong>Date:</strong> ${new Date(
-                      b.date
-                    ).toLocaleDateString()}</small>
+                        ${
+                          b.notes
+                            ? `<small class="d-block"><strong>Note:</strong> ${b.notes}</small>`
+                            : ""
+                        }
+                        <small class="d-inline-block me-2"><strong>Tags:</strong> ${b.tags.join(
+                          ", "
+                        )}</small>
+                        <small class="d-inline-block"><strong>Date:</strong> ${new Date(
+                          b.date
+                        ).toLocaleDateString()}</small>
+                    </div>
+                    <div>
+                        <button class="btn p-0 pin-btn" data-id="${
+                          b.url
+                        }" title="${pinTitle}">${isPinned}</button>
+                        <button class="btn p-0 edit-btn" data-id="${
+                          b.url
+                        }"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="#6c757d"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <title></title> <g id="Complete"> <g id="edit"> <g> <path d="M20,16v4a2,2,0,0,1-2,2H4a2,2,0,0,1-2-2V6A2,2,0,0,1,4,4H8" fill="none" stroke="#6c757d" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path> <polygon fill="none" points="12.5 15.8 22 6.2 17.8 2 8.3 11.5 8 16 12.5 15.8" stroke="#6c757d" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polygon> </g> </g> </g> </g></svg></button>
+                        <button class="btn p-0 delete-btn" data-id="${
+                          b.url
+                        }"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" fill="#dc3545"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><path fill="#dc3545" d="M160 256H96a32 32 0 0 1 0-64h256V95.936a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32V192h256a32 32 0 1 1 0 64h-64v672a32 32 0 0 1-32 32H192a32 32 0 0 1-32-32V256zm448-64v-64H416v64h192zM224 896h576V256H224v640zm192-128a32 32 0 0 1-32-32V416a32 32 0 0 1 64 0v320a32 32 0 0 1-32 32zm192 0a32 32 0 0 1-32-32V416a32 32 0 0 1 64 0v320a32 32 0 0 1-32 32z"></path></g></svg></button>
+                    </div>
                 </div>
-                <div>
-                    <button class="btn p-0 pin-btn" data-id="${
-                      b.url
-                    }" title="${pinTitle}">${isPinned}</button>
-                    <button class="btn p-0 edit-btn" data-id="${
-                      b.url
-                    }"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="#6c757d"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <title></title> <g id="Complete"> <g id="edit"> <g> <path d="M20,16v4a2,2,0,0,1-2,2H4a2,2,0,0,1-2-2V6A2,2,0,0,1,4,4H8" fill="none" stroke="#6c757d" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path> <polygon fill="none" points="12.5 15.8 22 6.2 17.8 2 8.3 11.5 8 16 12.5 15.8" stroke="#6c757d" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polygon> </g> </g> </g> </g></svg></button>
-                    <button class="btn p-0 delete-btn" data-id="${
-                      b.url
-                    }"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" fill="#dc3545"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><path fill="#dc3545" d="M160 256H96a32 32 0 0 1 0-64h256V95.936a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32V192h256a32 32 0 1 1 0 64h-64v672a32 32 0 0 1-32 32H192a32 32 0 0 1-32-32V256zm448-64v-64H416v64h192zM224 896h576V256H224v640zm192-128a32 32 0 0 1-32-32V416a32 32 0 0 1 64 0v320a32 32 0 0 1-32 32zm192 0a32 32 0 0 1-32-32V416a32 32 0 0 1 64 0v320a32 32 0 0 1-32 32z"></path></g></svg></button>
-                </div>
-            </div>
-          `;
+            `;
           catElem.appendChild(item);
         });
 
         container.appendChild(catElem);
       }
 
+      // Handle pagination buttons
+      const pageInfo = document.getElementById("pageInfo");
+      const prevBtn = document.getElementById("prevPage");
+      const nextBtn = document.getElementById("nextPage");
+
+      pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+      prevBtn.disabled = currentPage === 1;
+      nextBtn.disabled = currentPage === totalPages;
+      document.getElementById("pagination").style.display = "flex";
+
+      // Re-bind actions
       handleBookmarkActions();
     });
   }
@@ -163,7 +210,69 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Trigger render when "View" tab is clicked
-  document
-    .getElementById("view-tab")
-    .addEventListener("click", renderBookmarks);
+  document.getElementById("view-tab").addEventListener("click", () => {
+    chrome.storage.local.get(["bookmarks"], ({ bookmarks }) => {
+      allBookmarks = bookmarks;
+
+      // Populate category filter dropdown
+      const categories = [
+        ...new Set(bookmarks.map((b) => b.category).filter(Boolean)),
+      ];
+      const dropdown = document.getElementById("categoryFilter");
+      dropdown.innerHTML = `<option value="">All Categories</option>`;
+      categories.forEach((cat) => {
+        const opt = document.createElement("option");
+        opt.value = cat;
+        opt.textContent = cat;
+        dropdown.appendChild(opt);
+      });
+
+      // Initial render
+      renderBookmarks();
+    });
+  });
+
+  // Search Input
+  document.getElementById("searchInput").addEventListener("input", () => {
+    currentPage = 1;
+
+    const search = document.getElementById("searchInput").value.toLowerCase();
+    const category = document.getElementById("categoryFilter").value;
+    renderBookmarks(search, category);
+  });
+
+  // Category Filter
+  document.getElementById("categoryFilter").addEventListener("change", () => {
+    currentPage = 1;
+
+    const search = document.getElementById("searchInput").value.toLowerCase();
+    const category = document.getElementById("categoryFilter").value;
+    renderBookmarks(search, category);
+  });
+
+  // Prev Page
+  document.getElementById("prevPage").addEventListener("click", () => {
+    if (currentPage > 1) {
+      currentPage--;
+      const search = document.getElementById("searchInput").value.toLowerCase();
+      const category = document.getElementById("categoryFilter").value;
+      renderBookmarks(search, category);
+    }
+  });
+
+  // Next Page
+  document.getElementById("nextPage").addEventListener("click", () => {
+    currentPage++;
+    const search = document.getElementById("searchInput").value.toLowerCase();
+    const category = document.getElementById("categoryFilter").value;
+    renderBookmarks(search, category);
+  });
+
+  // Bookmark per page
+  document.getElementById("itemsPerPage").addEventListener("change", () => {
+    currentPage = 1; // Reset to page 1
+    const search = document.getElementById("searchInput").value.toLowerCase();
+    const category = document.getElementById("categoryFilter").value;
+    renderBookmarks(search, category);
+  });
 });
