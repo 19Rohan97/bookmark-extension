@@ -1,0 +1,27 @@
+body {
+  font-family: sans-serif;
+  padding: 10px;
+  width: 400px;
+}
+input {
+  width: 100%;
+  margin: 5px 0;
+  padding: 5px;
+}
+button {
+  margin-right: 5px;
+}
+svg {
+  width: 20px;
+}
+svg.pinned {
+  transform: rotate(-45deg);
+}
+.bookmark_item div:first-child {
+  width: 100%;
+  max-width: calc(100% - 50px);
+}
+.bookmark_item div:last-child {
+  width: 100%;
+  max-width: 50px;
+}
