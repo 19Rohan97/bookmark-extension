@@ -18,7 +18,8 @@ A lightweight Chrome Extension that allows you to bookmark the current webpage w
 
 ## Preview
 
-![popup](./screenshots/popup-preview.png)
+![popup - add](./screenshots/add.png)
+![popup - view](./screenshots/view.png)
 
 ## Installation
 
