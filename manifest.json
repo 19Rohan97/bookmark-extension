@@ -3,7 +3,7 @@
   "name": "Smart Bookmark Exporter",
   "version": "1.0",
   "description": "Bookmark pages with categories and tags, export to Markdown.",
-  "permissions": ["tabs", "storage", "activeTab"],
+  "permissions": ["tabs", "storage", "activeTab", "downloads"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": "icons/icon.png"
